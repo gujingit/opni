@@ -67,7 +67,7 @@ var _ = BeforeSuite(func() {
 			},
 		},
 	}
-	k8sManager, k8sClient = test.RunTestEnvironment(testEnv, &OpniDemoReconciler{})
+	k8sManager, k8sClient = test.RunTestEnvironment(testEnv, NewOpniDemoReconciler())
 }, 60)
 
 var _ = AfterSuite(func() {

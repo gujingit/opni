@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"github.com/phayes/freeport"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	demov1alpha1 "github.com/rancher/opni/apis/demo/v1alpha1"
 	"github.com/rancher/opni/apis/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -50,6 +51,9 @@ func RunTestEnvironment(
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	err = loggingv1beta1.AddToScheme(scheme.Scheme)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	err = monitoringv1.AddToScheme(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

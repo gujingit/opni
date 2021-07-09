@@ -10,9 +10,12 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/k3s-io/helm-controller v0.10.0
 	github.com/longhorn/upgrade-responder v0.1.2-0.20210521005936-d72e5ddbc541
+	github.com/nats-io/nats.go v1.11.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.43.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/rancher/k3d/v4 v4.4.5
 	github.com/spf13/cobra v1.1.3
 	github.com/ttacon/chalk v0.0.0-20160626202418-22c06c80ed31

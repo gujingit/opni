@@ -15,6 +15,7 @@ import (
 	"github.com/ttacon/chalk"
 	"github.com/vbauerster/mpb/v7"
 	"github.com/vbauerster/mpb/v7/decor"
+	"go.uber.org/atomic"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -185,11 +186,13 @@ func BuildCreateDemoCmd() *cobra.Command {
 
 			waitCtx, ca := context.WithTimeout(cmd.Context(), common.TimeoutFlagValue)
 
+			currentState := atomic.NewString("Waiting...")
+
 			waitingSpinner := p.AddSpinner(1,
 				mpb.AppendDecorators(
-					decor.OnComplete(decor.Name(chalk.Bold.TextStyle("Waiting for resource to become ready..."), decor.WCSyncSpaceR),
-						chalk.Bold.TextStyle("Done."),
-					),
+					decor.Any(func(s decor.Statistics) string {
+						return chalk.Bold.TextStyle(currentState.String())
+					}),
 				),
 				mpb.BarFillerMiddleware(
 					cliutil.CheckBarFiller(waitCtx, func(c context.Context) bool {
@@ -212,6 +215,7 @@ func BuildCreateDemoCmd() *cobra.Command {
 				}
 				state := opniDemo.Status.State
 				conditions := opniDemo.Status.Conditions
+				currentState.Store(state)
 
 				if state == "Ready" {
 					waitingSpinner.Increment()

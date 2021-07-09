@@ -26,12 +26,11 @@ import (
 	helmv1 "github.com/k3s-io/helm-controller/pkg/apis/helm.cattle.io/v1"
 	"github.com/rancher/opni/apis/demo/v1alpha1"
 	"github.com/rancher/opni/pkg/demo"
+	"github.com/rancher/opni/pkg/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,8 +41,15 @@ import (
 // OpniDemoReconciler reconciles a OpniDemo object
 type OpniDemoReconciler struct {
 	client.Client
-	log    logr.Logger
-	scheme *runtime.Scheme
+	log             logr.Logger
+	scheme          *runtime.Scheme
+	listenerManager *metrics.ListenerManager
+}
+
+func NewOpniDemoReconciler() *OpniDemoReconciler {
+	return &OpniDemoReconciler{
+		listenerManager: metrics.NewListenerManager(),
+	}
 }
 
 // KibanaDashboardPrerequisite describes a prerequisite object for the kibana dashboard pod
@@ -86,40 +92,44 @@ func (r *OpniDemoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if opniDemo.DeletionTimestamp != nil {
+		r.listenerManager.RemoveListener(client.ObjectKeyFromObject(opniDemo).String())
+	}
+
 	// Set conditions to empty to start
 	opniDemo.Status.Conditions = []string{}
 
 	if result, err := r.reconcileInfraStack(ctx, req, opniDemo); err != nil ||
 		result.Requeue || result.RequeueAfter != time.Duration(0) {
-		opniDemo.Status.State = "Deploying infrastructure resources"
+		opniDemo.Status.State = "Deploying infrastructure resources (1/6)"
 		err = r.Status().Update(ctx, opniDemo)
 		return result, err
 	}
 
 	if result, err := r.reconcileOpniStack(ctx, req, opniDemo); err != nil ||
 		result.Requeue || result.RequeueAfter != time.Duration(0) {
-		opniDemo.Status.State = "Deploying opni stack"
+		opniDemo.Status.State = "Deploying opni stack (2/6)"
 		err = r.Status().Update(ctx, opniDemo)
 		return result, err
 	}
 
 	if result, err := r.reconcileServicesStack(ctx, req, opniDemo); err != nil ||
 		result.Requeue || result.RequeueAfter != time.Duration(0) {
-		opniDemo.Status.State = "Deploying services stack"
+		opniDemo.Status.State = "Deploying services stack (3/6)"
 		err = r.Status().Update(ctx, opniDemo)
 		return result, err
 	}
 
 	if result, err := r.reconcileKibanaDashboards(ctx, req, opniDemo); err != nil ||
 		result.Requeue || result.RequeueAfter != time.Duration(0) {
-		opniDemo.Status.State = "Deploying Kibana dashboard pod"
+		opniDemo.Status.State = "Deploying Kibana dashboard pod (4/6)"
 		err = r.Status().Update(ctx, opniDemo)
 		return result, err
 	}
 
 	if result, err := r.reconcileLoggingCRs(ctx, req, opniDemo); err != nil ||
 		result.Requeue || result.RequeueAfter != time.Duration(0) {
-		opniDemo.Status.State = "Deploying Logging CRs"
+		opniDemo.Status.State = "Deploying Logging CRs (5/6)"
 		err = r.Status().Update(ctx, opniDemo)
 		return result, err
 	}
@@ -127,6 +137,12 @@ func (r *OpniDemoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	result := ctrl.Result{}
 	if len(opniDemo.Status.Conditions) == 0 {
 		opniDemo.Status.State = "Ready"
+
+		// Add the metrics listener for the opnidemo if needed
+		if key := client.ObjectKeyFromObject(opniDemo).String(); !r.listenerManager.ListenerExists(key) {
+			listenerCtx := r.listenerManager.AddListener(key)
+			metrics.RunMetricsExporter(listenerCtx, r.log, opniDemo)
+		}
 	} else {
 		opniDemo.Status.State = "Waiting"
 		result = ctrl.Result{
@@ -154,8 +170,6 @@ func (r *OpniDemoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.ClusterRoleBinding{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&rbacv1.Role{}).
-		Owns(&extv1beta1.Ingress{}).
-		Owns(&storagev1.StorageClass{}).
 		Complete(r)
 }
 
@@ -390,8 +404,8 @@ func (r *OpniDemoReconciler) reconcileKibanaDashboards(
 	default:
 		opniDemo.Status.Conditions = append(opniDemo.Status.Conditions,
 			fmt.Sprintf("Waiting for pod %s to finish, currently %s", pod.Name, s))
+		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
-	return ctrl.Result{}, nil
 }
 
 func (r *OpniDemoReconciler) reconcileLoggingCRs(
