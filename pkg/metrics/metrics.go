@@ -61,8 +61,8 @@ type ForecastedCPUUsage struct {
 }
 
 type ForecastedMetricBounds struct {
-	YhatUpper  float64 `json:"yhat_lower"`
-	YhatLower  float64 `json:"yhat_upper"`
+	YhatUpper  float64 `json:"yhat_upper"`
+	YhatLower  float64 `json:"yhat_lower"`
 	MetricName string  `json:"metric_name"`
 }
 
