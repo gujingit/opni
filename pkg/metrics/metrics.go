@@ -31,6 +31,22 @@ var (
 		"opni",
 		"instance",
 	})
+	forecastedLowerBound = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "opni",
+		Name:      "forecasted_lower_bound",
+		Help:      "Forecasted lower bound for individual metrics",
+	}, []string{
+		"opni",
+		"metric_name",
+	})
+	forecastedUpperBound = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "opni",
+		Name:      "forecasted_upper_bound",
+		Help:      "Forecasted upper bound for individual metrics",
+	}, []string{
+		"opni",
+		"metric_name",
+	})
 )
 
 func init() {
@@ -40,6 +56,12 @@ func init() {
 type ForecastedCPUUsage struct {
 	Instance string  `json:"instance"`
 	Value    float64 `json:"value"`
+}
+
+type ForecastedMetricBounds struct {
+	YhatUpper  float64 `json:"yhat_lower"`
+	YhatLower  float64 `json:"yhat_upper"`
+	MetricName string  `json:"metric_name"`
 }
 
 func RunMetricsExporter(
@@ -84,7 +106,7 @@ func runNatsSubscriber(
 	}
 	defer ec.Close()
 
-	sub, err := ec.Subscribe("forecasted_cpu_usage", func(msg *ForecastedCPUUsage) {
+	subCPUUsage, err := ec.Subscribe("forecasted_cpu_usage", func(msg *ForecastedCPUUsage) {
 		logger.Info("Received forecasted_cpu_usage update")
 		forecastedCPUUsage.With(prometheus.Labels{
 			"opni":     opniSystem,
@@ -95,10 +117,27 @@ func runNatsSubscriber(
 		logger.Error(err, "error subscribing to forecasted_cpu_usage")
 		return
 	}
+	defer subCPUUsage.Drain()
+
+	subBounds, err := ec.Subscribe("forecasted_metric_bounds", func(msg *ForecastedMetricBounds) {
+		logger.Info("Received forecasted_metric_bounds update")
+		forecastedLowerBound.With(prometheus.Labels{
+			"opni":        opniSystem,
+			"metric_name": msg.MetricName,
+		}).Set(msg.YhatLower)
+		forecastedUpperBound.With(prometheus.Labels{
+			"opni":        opniSystem,
+			"metric_name": msg.MetricName,
+		}).Set(msg.YhatUpper)
+	})
+	if err != nil {
+		logger.Error(err, "error subscribing to forecasted_metric_bounds")
+		return
+	}
+	defer subBounds.Drain()
 
 	<-ctx.Done()
 	logger.Info("Exiting nats subscriber")
-	sub.Drain()
 }
 
 func ReconcileServiceMonitor(
