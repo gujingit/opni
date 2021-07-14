@@ -51,6 +51,8 @@ var (
 
 func init() {
 	metrics.Registry.MustRegister(forecastedCPUUsage)
+	metrics.Registry.MustRegister(forecastedLowerBound)
+	metrics.Registry.MustRegister(forecastedUpperBound)
 }
 
 type ForecastedCPUUsage struct {
