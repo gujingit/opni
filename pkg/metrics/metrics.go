@@ -47,12 +47,28 @@ var (
 		"opni",
 		"metric_name",
 	})
+	cpuBacklog = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "opni",
+		Name:      "CPU Inference Backlog",
+		Help:      "CPU Inference Backlog",
+	}, []string{
+		"opni",
+	})
+	gpuBacklog = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "opni",
+		Name:      "GPU Inference Backlog",
+		Help:      "GPU Inference Backlog",
+	}, []string{
+		"opni",
+	})
 )
 
 func init() {
 	metrics.Registry.MustRegister(forecastedCPUUsage)
 	metrics.Registry.MustRegister(forecastedLowerBound)
 	metrics.Registry.MustRegister(forecastedUpperBound)
+	metrics.Registry.MustRegister(cpuBacklog)
+	metrics.Registry.MustRegister(gpuBacklog)
 }
 
 type ForecastedCPUUsage struct {
@@ -64,6 +80,10 @@ type ForecastedMetricBounds struct {
 	YhatUpper  float64 `json:"yhat_upper"`
 	YhatLower  float64 `json:"yhat_lower"`
 	MetricName string  `json:"metric_name"`
+}
+
+type Backlog struct {
+	BacklogCount float64 `json:"backlog_count"`
 }
 
 func RunMetricsExporter(
@@ -137,6 +157,30 @@ func runNatsSubscriber(
 		return
 	}
 	defer subBounds.Drain()
+
+	subCPUBacklog, err := ec.Subscribe("opni_nulog_cpu", func(msg *Backlog) {
+		logger.Info("Received CPU backlog update")
+		cpuBacklog.With(prometheus.Labels{
+			"opni": opniSystem,
+		}).Set(msg.BacklogCount)
+	})
+	if err != nil {
+		logger.Error(err, "error subscribing to CPU backlog")
+		return
+	}
+	defer subCPUBacklog.Drain()
+
+	subGPUBacklog, err := ec.Subscribe("opni_nulog_gpu", func(msg *Backlog) {
+		logger.Info("Received GPU backlog update")
+		gpuBacklog.With(prometheus.Labels{
+			"opni": opniSystem,
+		}).Set(msg.BacklogCount)
+	})
+	if err != nil {
+		logger.Error(err, "error subscribing to GPU backlog")
+		return
+	}
+	defer subGPUBacklog.Drain()
 
 	<-ctx.Done()
 	logger.Info("Exiting nats subscriber")
