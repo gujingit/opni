@@ -49,14 +49,14 @@ var (
 	})
 	cpuBacklog = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "opni",
-		Name:      "CPU Inference Backlog",
+		Name:      "cpu_inference_backlog",
 		Help:      "CPU Inference Backlog",
 	}, []string{
 		"opni",
 	})
 	gpuBacklog = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "opni",
-		Name:      "GPU Inference Backlog",
+		Name:      "gpu_inference_backlog",
 		Help:      "GPU Inference Backlog",
 	}, []string{
 		"opni",
